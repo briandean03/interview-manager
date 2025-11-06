@@ -4,6 +4,11 @@ import { Users, Calendar, FileText, TrendingUp, Clock, CircleCheck as CheckCircl
 import QuickActions from '../components/QuickActions'
 import AppointmentCalendar from '../components/AppointmentCalendar'
 import AppointmentForm from '../components/AppointmentForm'
+import CandidateSearchModal from '../components/CandidateSearchModal'
+
+
+const [showCandidateSearch, setShowCandidateSearch] = useState(false)
+
 
 interface DashboardStats {
   totalCandidates: number
@@ -157,6 +162,16 @@ const Dashboard: React.FC = () => {
           />
         </div>
 
+        <div className="mb-8">
+          <button
+            onClick={() => setShowCandidateSearch(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow"
+          >
+            Search Candidate Answers
+          </button>
+        </div>
+
+
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Recent Activity */}
@@ -205,9 +220,19 @@ const Dashboard: React.FC = () => {
           onClose={() => setShowAppointmentForm(false)}
           onSuccess={handleAppointmentSuccess}
         />
+
+        <CandidateSearchModal
+          isOpen={showCandidateSearch}
+          onClose={() => setShowCandidateSearch(false)}
+        />
+
       </div>
     </div>
+
+          
   )
+
+  
 }
 
 export default Dashboard
