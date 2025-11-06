@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Search, FolderOpen } from 'lucide-react'
 
@@ -21,12 +21,38 @@ const CandidateSearchModal: React.FC<CandidateSearchModalProps> = ({ isOpen, onC
   const [results, setResults] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(false)
 
+  // ✅ Fetch all candidates with non-null answer_vids_folder_id on open
+  useEffect(() => {
+    if (isOpen) {
+      fetchCandidatesWithVideos()
+    }
+  }, [isOpen])
+
+  const fetchCandidatesWithVideos = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('hrta_cd00-01_resume_extraction')
+        .select('candidate_id, first_name, last_name, position_code, answer_vids_folder_id')
+        .not('answer_vids_folder_id', 'is', null)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setResults(data || [])
+    } catch (err) {
+      console.error('Error fetching candidates:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSearch = async () => {
     setLoading(true)
     try {
       let query = supabase
         .from('hrta_cd00-01_resume_extraction')
         .select('candidate_id, first_name, last_name, position_code, answer_vids_folder_id')
+        .not('answer_vids_folder_id', 'is', null) // ✅ still ensure folder exists
 
       if (name.trim()) {
         query = query.ilike('first_name', `%${name}%`)
@@ -50,7 +76,7 @@ const CandidateSearchModal: React.FC<CandidateSearchModalProps> = ({ isOpen, onC
       alert('No folder available for this candidate.')
       return
     }
-    // You can change this base URL to wherever your folders are stored
+    // Replace this with your actual folder viewer URL
     const baseUrl = 'https://your-storage-domain.com/folders/'
     window.open(`${baseUrl}${folderId}`, '_blank')
   }
@@ -61,10 +87,11 @@ const CandidateSearchModal: React.FC<CandidateSearchModalProps> = ({ isOpen, onC
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Search Candidates</h2>
+          <h2 className="text-xl font-semibold text-gray-800">Candidates with Recorded Answers</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
         </div>
 
+        {/* Search Controls */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <input
             type="text"
@@ -91,26 +118,30 @@ const CandidateSearchModal: React.FC<CandidateSearchModalProps> = ({ isOpen, onC
           {loading ? 'Searching...' : 'Search'}
         </button>
 
+        {/* Results */}
         <div className="mt-6 max-h-64 overflow-y-auto">
-          {results.length === 0 && !loading && (
-            <p className="text-gray-500 text-center">No candidates found.</p>
-          )}
-          {results.map((c) => (
-            <div key={c.candidate_id} className="flex justify-between items-center border-b py-2">
-              <div>
-                <p className="font-medium text-gray-800">
-                  {c.first_name} {c.last_name}
-                </p>
-                <p className="text-sm text-gray-500">Position: {c.position_code}</p>
+          {loading ? (
+            <p className="text-gray-500 text-center py-4">Loading...</p>
+          ) : results.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No candidates found.</p>
+          ) : (
+            results.map((c) => (
+              <div key={c.candidate_id} className="flex justify-between items-center border-b py-2">
+                <div>
+                  <p className="font-medium text-gray-800">
+                    {c.first_name} {c.last_name}
+                  </p>
+                  <p className="text-sm text-gray-500">Position: {c.position_code}</p>
+                </div>
+                <button
+                  onClick={() => handleViewFolder(c.answer_vids_folder_id)}
+                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                >
+                  <FolderOpen size={18} /> View Answers
+                </button>
               </div>
-              <button
-                onClick={() => handleViewFolder(c.answer_vids_folder_id)}
-                className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-              >
-                <FolderOpen size={18} /> View Answers
-              </button>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
