@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, startOfWeek, endOfWeek } from 'date-fns'
-import { Calendar, ChevronLeft, ChevronRight, Clock, User } from 'lucide-react'
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameDay,
+  parseISO,
+  startOfWeek,
+  endOfWeek,
+} from 'date-fns'
+import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 
 interface Appointment {
   id: number
@@ -24,7 +33,7 @@ interface AppointmentCalendarProps {
 const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   onAppointmentSelect,
   selectedDate = new Date(),
-  onDateSelect
+  onDateSelect,
 }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -54,42 +63,35 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
 
       if (candidatesError) throw candidatesError
 
-      // Merge appointment data with candidate data
-      const appointmentsWithCandidates = (appointmentsData || []).map(appointment => ({
-        ...appointment,
-        candidate: candidatesData?.find(c => c.candidate_id === appointment.candidate_id)
+      const merged = (appointmentsData || []).map((a) => ({
+        ...a,
+        candidate: candidatesData?.find((c) => c.candidate_id === a.candidate_id),
       }))
 
-      setAppointments(appointmentsWithCandidates)
-    } catch (error) {
-      console.error('Error fetching appointments:', error)
+      setAppointments(merged)
+    } catch (err) {
+      console.error('Error fetching appointments:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  const getAppointmentsForDate = (date: Date) => {
-    return appointments.filter(appointment => {
-      if (!appointment.appointment_time) return false
+  const getAppointmentsForDate = (date: Date) =>
+    appointments.filter((a) => {
+      if (!a.appointment_time) return false
       try {
-        return isSameDay(parseISO(appointment.appointment_time), date)
+        return isSameDay(parseISO(a.appointment_time), date)
       } catch {
         return false
       }
     })
-  }
 
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentMonth(prev => {
-      const newMonth = new Date(prev)
-      if (direction === 'prev') {
-        newMonth.setMonth(prev.getMonth() - 1)
-      } else {
-        newMonth.setMonth(prev.getMonth() + 1)
-      }
-      return newMonth
+  const navigateMonth = (dir: 'prev' | 'next') =>
+    setCurrentMonth((p) => {
+      const m = new Date(p)
+      m.setMonth(p.getMonth() + (dir === 'next' ? 1 : -1))
+      return m
     })
-  }
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
@@ -97,26 +99,18 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   const calendarEnd = endOfWeek(monthEnd)
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
 
-  const isCurrentMonth = (date: Date) => {
-    return date.getMonth() === currentMonth.getMonth()
-  }
-
-  const isToday = (date: Date) => {
-    return isSameDay(date, new Date())
-  }
-
-  const isSelected = (date: Date) => {
-    return isSameDay(date, selectedDate)
-  }
+  const isCurrentMonth = (d: Date) => d.getMonth() === currentMonth.getMonth()
+  const isToday = (d: Date) => isSameDay(d, new Date())
+  const isSelected = (d: Date) => isSameDay(d, selectedDate)
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-          <div className="grid grid-cols-7 gap-2">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="animate-pulse space-y-3">
+          <div className="h-5 bg-gray-200 rounded w-1/3" />
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {Array.from({ length: 35 }).map((_, i) => (
-              <div key={i} className="h-20 bg-gray-100 rounded"></div>
+              <div key={i} className="aspect-square bg-gray-100 rounded" />
             ))}
           </div>
         </div>
@@ -125,95 +119,88 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Calendar className="h-5 w-5 text-blue-600" />
-            <h3 className="text-lg font-semibold text-gray-900">
-              {format(currentMonth, 'MMMM yyyy')}
-            </h3>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => navigateMonth('prev')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => navigateMonth('next')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+      <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-blue-600" />
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+            {format(currentMonth, 'MMMM yyyy')}
+          </h3>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => navigateMonth('prev')}
+            className="p-2 hover:bg-gray-100 rounded-lg transition"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => navigateMonth('next')}
+            className="p-2 hover:bg-gray-100 rounded-lg transition"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
-      {/* Calendar Grid */}
-      <div className="p-4">
-        {/* Day Headers */}
-        <div className="grid grid-cols-7 gap-2 mb-2">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
-              {day}
+      {/* Calendar */}
+      <div className="p-2 sm:p-4 overflow-x-auto">
+        {/* Day headers */}
+        <div className="grid grid-cols-7 text-center text-[11px] sm:text-xs font-medium text-gray-500 mb-1 sm:mb-2 min-w-[420px]">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+            <div key={d} className="py-1 sm:py-2">
+              {d}
             </div>
           ))}
         </div>
 
-        {/* Calendar Days */}
-        <div className="grid grid-cols-7 gap-2">
-          {calendarDays.map(day => {
-            const dayAppointments = getAppointmentsForDate(day)
-            const isCurrentMonthDay = isCurrentMonth(day)
-            const isTodayDay = isToday(day)
-            const isSelectedDay = isSelected(day)
+        {/* Days */}
+        <div className="grid grid-cols-7 gap-[2px] sm:gap-2 min-w-[420px]">
+          {calendarDays.map((day) => {
+            const appts = getAppointmentsForDate(day)
+            const cur = isCurrentMonth(day)
+            const today = isToday(day)
+            const sel = isSelected(day)
 
             return (
               <button
                 key={day.toString()}
                 onClick={() => onDateSelect?.(day)}
-                className={`
-                  h-20 p-1 rounded-lg border transition-colors text-left relative
-                  ${isCurrentMonthDay 
-                    ? 'border-gray-200 hover:bg-gray-50' 
-                    : 'border-gray-100 text-gray-400'
+                className={`aspect-square p-[3px] sm:p-1 rounded-md border text-left transition relative
+                  ${
+                    cur
+                      ? 'border-gray-200 hover:bg-gray-50'
+                      : 'border-gray-100 text-gray-400'
                   }
-                  ${isTodayDay ? 'bg-blue-50 border-blue-200' : ''}
-                  ${isSelectedDay ? 'bg-blue-100 border-blue-300' : ''}
+                  ${today ? 'bg-blue-50 border-blue-200' : ''}
+                  ${sel ? 'bg-blue-100 border-blue-300' : ''}
                 `}
               >
-                <div className="text-sm font-medium">
+                <div className="text-[11px] sm:text-sm font-medium leading-none">
                   {format(day, 'd')}
                 </div>
-                
+
                 {/* Appointment indicators */}
-                <div className="mt-1 space-y-1">
-                  {dayAppointments.slice(0, 2).map((appointment, index) => (
+                <div className="mt-0.5 sm:mt-1 space-y-[2px]">
+                  {appts.slice(0, 2).map((a) => (
                     <div
-                      key={appointment.id}
+                      key={a.id}
                       onClick={(e) => {
                         e.stopPropagation()
-                        onAppointmentSelect?.(appointment)
+                        onAppointmentSelect?.(a)
                       }}
-                      className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded truncate hover:bg-blue-200 transition-colors"
+                      className="text-[10px] sm:text-xs bg-blue-100 text-blue-800 px-1 rounded truncate hover:bg-blue-200"
                     >
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-2 w-2" />
-                        <span>
-                          {appointment.appointment_time ? 
-                            format(parseISO(appointment.appointment_time), 'HH:mm')
-                            : 'No time'
-                          }
-                        </span>
-                      </div>
+                      <Clock className="inline-block h-2 w-2 mr-0.5" />
+                      {a.appointment_time
+                        ? format(parseISO(a.appointment_time), 'HH:mm')
+                        : 'No time'}
                     </div>
                   ))}
-                  {dayAppointments.length > 2 && (
-                    <div className="text-xs text-gray-500 text-center">
-                      +{dayAppointments.length - 2} more
+                  {appts.length > 2 && (
+                    <div className="text-[10px] sm:text-xs text-gray-500 text-center">
+                      +{appts.length - 2} more
                     </div>
                   )}
                 </div>

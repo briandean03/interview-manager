@@ -1,5 +1,5 @@
 import React from 'react'
-import { Calendar, Users, FileText, ChartBar as BarChart3, Plus, Clock } from 'lucide-react'
+import { Calendar, Users, FileText, ChartBar as BarChart3, Clock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 interface QuickActionsProps {
@@ -45,39 +45,43 @@ const QuickActions: React.FC<QuickActionsProps> = ({
   ]
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
-        <div className="flex items-center space-x-4 text-sm text-gray-600">
-          <div className="flex items-center space-x-1">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 max-w-full mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
+        <h3 className="text-lg font-semibold text-gray-900 text-center sm:text-left">
+          Quick Actions
+        </h3>
+        <div className="flex justify-center sm:justify-end flex-wrap gap-3 text-xs sm:text-sm text-gray-600">
+          <div className="flex items-center gap-1">
             <Users className="h-4 w-4" />
             <span>{candidateCount} candidates</span>
           </div>
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center gap-1">
             <Clock className="h-4 w-4" />
             <span>{appointmentCount} appointments</span>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Action grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {actions.map((action, index) => {
           const ActionComponent = action.link ? Link : 'button'
-          const actionProps = action.link
-            ? { to: action.link }
-            : { onClick: action.onClick }
+          const actionProps = action.link ? { to: action.link } : { onClick: action.onClick }
 
           return (
             <ActionComponent
               key={index}
               {...actionProps}
-              className={`${action.color} text-white p-4 rounded-lg transition-colors group text-left block min-h-[100px]`}
+              className={`${action.color} text-white rounded-lg p-3 sm:p-4 flex flex-col justify-center items-start text-left transition-colors duration-200 shadow-sm hover:shadow group`}
             >
-              <div className="flex items-center space-x-3 mb-2">
-                <action.icon className="h-6 w-6 flex-shrink-0" />
-                <h4 className="font-medium text-base leading-tight">{action.title}</h4>
+              <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                <action.icon className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+                <h4 className="font-medium text-sm sm:text-base leading-tight">{action.title}</h4>
               </div>
-              <p className="text-sm opacity-90 leading-relaxed">{action.description}</p>
+              <p className="text-[12px] sm:text-sm opacity-90 leading-snug">
+                {action.description}
+              </p>
             </ActionComponent>
           )
         })}
