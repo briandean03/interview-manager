@@ -27,6 +27,8 @@ interface Candidate {
   vote?: number
   application_date?: string
   created_at: string
+  date_interviewed?: string // 🆕 add this line
+
 }
 
 const CandidateSelection: React.FC = () => {
@@ -555,7 +557,6 @@ To fix this:
                       >
                         {selectedCandidate.status}
                       </span>
-
                       {selectedCandidate.vote !== null && selectedCandidate.vote !== undefined && (
                         <>
                           <button
@@ -582,7 +583,25 @@ To fix this:
 
                 {/* Details Content */}
                 <div className="flex-1 overflow-y-auto p-6">
+                  {/* Date Interviewed Display */}
+                  {selectedCandidate.date_interviewed && (
+                    <div className="mb-6">
+                      <div className="flex items-center space-x-2 text-sm text-gray-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 inline-flex">
+                        <Clock className="h-4 w-4 text-blue-600" />
+                        <span className="font-medium">Interviewed on:</span>
+                        <span className="text-gray-900 font-semibold">
+                          {new Date(selectedCandidate.date_interviewed).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                    
                     {/* Contact Information */}
                     <div className="space-y-6">
                       <div>
@@ -654,6 +673,7 @@ To fix this:
                           <span>Professional Details</span>
                         </h3>
                         <div className="space-y-4">
+
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Position Applied</label>
                             <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
