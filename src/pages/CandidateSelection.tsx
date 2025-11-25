@@ -46,6 +46,8 @@ const CandidateSelection: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>('')
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'failed'>('checking')
+  const [createdFilter, setCreatedFilter] = useState<string>('all')
+
   
   // Appointment form state
   const [showAppointmentForm, setShowAppointmentForm] = useState(false)
@@ -232,32 +234,90 @@ To fix this:
     }
   }, [fetchCandidates])
 
+
+
   // Memoized filtered candidates to prevent unnecessary recalculations
-  const filteredCandidates = React.useMemo(() => {
-    return candidates.filter(candidate => {
-      const searchLower = searchTerm.toLowerCase()
-      const matchesSearch = 
-        candidate.first_name?.toLowerCase().includes(searchLower) ||
-        candidate.last_name?.toLowerCase().includes(searchLower) ||
-        candidate.email?.toLowerCase().includes(searchLower) ||
-        candidate.position_code?.toLowerCase().includes(searchLower)
-      
-      const matchesStatus = statusFilter === 'all' || candidate.status === statusFilter
-      const matchesPosition = positionFilter === 'all' || candidate.position_code === positionFilter
+const filteredCandidates = React.useMemo(() => {
+  return candidates.filter(candidate => {
 
-      return matchesSearch && matchesStatus && matchesPosition
-    })
-  }, [candidates, searchTerm, statusFilter, positionFilter])
+    
+    const searchLower = searchTerm.toLowerCase()
 
-  const uniquePositions = React.useMemo(() => 
-    [...new Set(candidates.map(c => c.position_code).filter(Boolean))], 
-    [candidates]
-  )
-  
-  const uniqueStatuses = React.useMemo(() => 
-    [...new Set(candidates.map(c => c.status).filter(Boolean))], 
-    [candidates]
-  )
+    // SEARCH filter
+    const matchesSearch =
+      candidate.first_name?.toLowerCase().includes(searchLower) ||
+      candidate.last_name?.toLowerCase().includes(searchLower) ||
+      candidate.email?.toLowerCase().includes(searchLower) ||
+      candidate.position_code?.toLowerCase().includes(searchLower)
+
+    // STATUS filter
+    const matchesStatus =
+      statusFilter === 'all' || candidate.status === statusFilter
+
+    // POSITION filter
+    const matchesPosition =
+      positionFilter === 'all' || candidate.position_code === positionFilter
+
+    // DATE filter
+    let matchesCreated = true
+    if (createdFilter !== 'all') {
+      const created = new Date(candidate.created_at)
+      const now = new Date()
+
+      if (createdFilter === 'today') {
+        const today = new Date()
+        today.setHours(0,0,0,0)
+        matchesCreated = created >= today
+      }
+
+      if (createdFilter === '7days') {
+        const cutoff = new Date()
+        cutoff.setDate(now.getDate() - 7)
+        matchesCreated = created >= cutoff
+      }
+
+      if (createdFilter === '30days') {
+        const cutoff = new Date()
+        cutoff.setDate(now.getDate() - 30)
+        matchesCreated = created >= cutoff
+      }
+
+      if (createdFilter === 'thismonth') {
+        const first = new Date(now.getFullYear(), now.getMonth(), 1)
+        matchesCreated = created >= first
+      }
+
+      if (createdFilter === 'lastmonth') {
+        const firstLast = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        const endLast = new Date(now.getFullYear(), now.getMonth(), 0)
+        matchesCreated = created >= firstLast && created <= endLast
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesPosition && matchesCreated
+  })
+}, [candidates, searchTerm, statusFilter, positionFilter, createdFilter])
+
+  // Extract unique positions
+const uniquePositions = React.useMemo(() => 
+  [...new Set(candidates.map(c => c.position_code).filter(Boolean))], 
+  [candidates]
+)
+
+// Extract unique statuses EXCEPT video statuses
+const uniqueStatuses = React.useMemo(() =>
+  [...new Set(
+    candidates
+      .map(c => c.status)
+      .filter(status =>
+        status &&
+        !status.toLowerCase().includes("answer video to")
+      )
+  )],
+  [candidates]
+)
+
+
 
   const startEdit = useCallback((field: string, currentValue: any) => {
     if (!selectedCandidate) return
@@ -305,6 +365,8 @@ To fix this:
 
       if (error) throw error
 
+      
+
       // Update local state
       const updatedCandidate = { ...selectedCandidate, [editingField]: updateValue }
       setSelectedCandidate(updatedCandidate)
@@ -324,6 +386,42 @@ To fix this:
       setSaving(false)
     }
   }, [editingField, selectedCandidate, editValue])
+
+    const handleMoveToForInterview = useCallback(async () => {
+    if (!selectedCandidate) return
+
+    setSaving(true)
+
+    try {
+      const client = getSupabaseClient()
+      if (!client) throw new Error('Supabase client not available')
+
+      const newStatus = 'For Interview'
+
+      const { error } = await client
+        .from('hrta_cd00-01_resume_extraction')
+        .update({ status: newStatus })
+        .eq('candidate_id', selectedCandidate.candidate_id)
+
+      if (error) throw error
+
+      // Update UI immediately
+      const updatedCandidate = { ...selectedCandidate, status: newStatus }
+      setSelectedCandidate(updatedCandidate)
+      setCandidates(prev =>
+        prev.map(c =>
+          c.candidate_id === selectedCandidate.candidate_id ? updatedCandidate : c
+        )
+      )
+    } catch (error) {
+      console.error('Error updating status to For Interview:', error)
+      const msg = error instanceof Error ? error.message : 'Unknown error occurred'
+      alert(`Failed to change status: ${msg}`)
+    } finally {
+      setSaving(false)
+    }
+  }, [selectedCandidate, setCandidates])
+
 
   const handleScheduleInterview = () => {
     if (selectedCandidate) {
@@ -459,6 +557,24 @@ To fix this:
                 <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               </div>
             </div>
+
+            <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <select
+              className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+              value={createdFilter}
+              onChange={(e) => setCreatedFilter(e.target.value)}
+            >
+              <option value="all">All Dates</option>
+              <option value="today">Today</option>
+              <option value="7days">Last 7 Days</option>
+              <option value="30days">Last 30 Days</option>
+              <option value="thismonth">This Month</option>
+              <option value="lastmonth">Last Month</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          </div>
+
             
             <div className="mt-4">
               <p className="text-gray-600">
@@ -550,33 +666,55 @@ To fix this:
                       </div>
                     </div>
 
-                    {/* Right side: status + buttons */}
-                    <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2">
-                      <span
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium border ${getStatusColor(selectedCandidate.status)}`}
-                      >
-                        {selectedCandidate.status}
-                      </span>
-                      {selectedCandidate.vote !== null && selectedCandidate.vote !== undefined && (
-                        <>
-                          <button
-                            onClick={handleScheduleInterview}
-                            className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-xs sm:text-sm"
-                          >
-                            <Calendar className="h-4 w-4" />
-                            <span>Schedule</span>
-                          </button>
-                          <div className="flex items-center space-x-1 text-sm font-semibold text-gray-900">
-                            <Award className="h-4 w-4 text-yellow-600" />
-                            <span>
-                              {typeof selectedCandidate.vote === 'number'
-                                ? selectedCandidate.vote.toFixed(1)
-                                : selectedCandidate.vote}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                   {/* Right side: status + buttons */}
+<div className="flex flex-wrap items-center justify-start sm:justify-end gap-2">
+
+  {/* Status pill */}
+  <span
+    className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium border ${getStatusColor(selectedCandidate.status)}`}
+  >
+    {selectedCandidate.status}
+  </span>
+
+  {/* Move to For Interview */}
+  {selectedCandidate.status === 'CV Processed' && (
+    <button
+      onClick={handleMoveToForInterview}
+      disabled={saving}
+      className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-xs sm:text-sm"
+    >
+      <Calendar className="h-4 w-4" />
+      <span>{saving ? 'Updating...' : 'Move to For Interview'}</span>
+    </button>
+  )}
+
+  {/* Schedule button + vote */}
+  {selectedCandidate.vote !== null && selectedCandidate.vote !== undefined && (
+    <>
+
+      {/* Schedule Interview */}
+      <button
+        onClick={handleScheduleInterview}
+        className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-xs sm:text-sm"
+      >
+        <Calendar className="h-4 w-4" />
+        <span>Schedule</span>
+      </button>
+
+      {/* Vote badge */}
+      <div className="flex items-center space-x-1 text-sm font-semibold text-gray-900">
+        <Award className="h-4 w-4 text-yellow-600" />
+        <span>
+          {typeof selectedCandidate.vote === 'number'
+            ? selectedCandidate.vote.toFixed(1)
+            : selectedCandidate.vote}
+        </span>
+      </div>
+
+    </>
+  )}
+</div>
+
                   </div>
 
                 </div>
