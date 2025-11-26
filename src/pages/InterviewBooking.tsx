@@ -1,51 +1,109 @@
-import React, { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns'
-import { Calendar, Clock, MapPin, User, ChevronLeft, ChevronRight, Mail, Phone, Plus, CreditCard as Edit, Trash2 } from 'lucide-react'
-import AppointmentForm from '../components/AppointmentForm'
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { 
+  format, 
+  addDays, 
+  startOfWeek, 
+  isSameDay, 
+  parseISO 
+} from 'date-fns';
+import { 
+  Calendar, Clock, MapPin, User, ChevronLeft, ChevronRight, 
+  Mail, Phone, Plus, CreditCard as Edit, Trash2 
+} from 'lucide-react';
+import AppointmentForm from '../components/AppointmentForm';
+import { useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+
 
 interface Candidate {
-  candidate_id: string
-  first_name: string
-  last_name: string
-  email: string
-  mobile_num?: string
-  position_code: string
-  status: string
-  vote?: number
-  ai_evaluation?: string
+  candidate_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  mobile_num?: string;
+  position_code: string;
+  status: string;
+  vote?: number;
+  ai_evaluation?: string;
 }
 
 interface Appointment {
-  id: number
-  candidate_id: string
-  appointment_time: string
-  position_code?: string
-  q_revision?: string
-  created_at: string
+  id: number;
+  candidate_id: string;
+  appointment_time: string;
+  position_code?: string;
+  q_revision?: string;
+  created_at: string;
 }
 
 interface AppointmentWithCandidate extends Appointment {
-  candidate?: Candidate
+  candidate?: Candidate;
 }
 
 const InterviewBooking: React.FC = () => {
-  const [appointments, setAppointments] = useState<AppointmentWithCandidate[]>([])
-  const [candidates, setCandidates] = useState<Candidate[]>([])
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithCandidate | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [currentWeek, setCurrentWeek] = useState(new Date())
-  const [showAppointmentForm, setShowAppointmentForm] = useState(false)
-  const [editingAppointment, setEditingAppointment] = useState<AppointmentWithCandidate | null>(null)
+  const [appointments, setAppointments] = useState<AppointmentWithCandidate[]>([]);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithCandidate | null>(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+
+  // selected date (state only!)
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  // calendar week
+  const [currentWeek, setCurrentWeek] = useState<Date | null>(null);
+
+  // appointment form
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<AppointmentWithCandidate | null>(null);
+
+  // query param: ?date=2025-12-01T...
+  const [searchParams] = useSearchParams();
+  const selectedDateParam = searchParams.get("date");
 
   const timeSlots = [
-    '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'
-  ]
+  "08:00", "09:00", "10:00", "11:00", "12:00",
+  "13:00", "14:00", "15:00", "16:00", "17:00",
+  "18:00", "19:00", "20:00", "21:00", "22:00"
+];
 
+
+  // Sync selected date + current week to the URL date
   useEffect(() => {
-    fetchData()
-  }, [])
+    let dateFromURL: Date;
+
+    if (selectedDateParam) {
+      try {
+        const [year, month, day] = selectedDateParam.split("-").map(Number);
+        const safeDate = new Date(year, month - 1, day); //no timezone shift
+
+        if (!isNaN(safeDate.getTime())) {
+          dateFromURL = safeDate;
+        } else {
+          dateFromURL = new Date();
+        }
+      } catch {
+        dateFromURL = new Date();
+      }
+    } else {
+      dateFromURL = new Date();
+    }
+
+    setSelectedDate(dateFromURL);
+    setCurrentWeek(startOfWeek(dateFromURL, { weekStartsOn: 1 }));
+  }, [selectedDateParam]);
+
+
+
+
+  // Fetch from Supabase
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+
 
   const fetchData = async () => {
     try {
@@ -137,7 +195,11 @@ const InterviewBooking: React.FC = () => {
     return Array.from({ length: 7 }, (_, i) => addDays(start, i))
   }
 
-  const weekDays = getWeekDays(currentWeek)
+  const weekDays = currentWeek ? getWeekDays(currentWeek) : [];
+if (!currentWeek) {
+  return <div className="p-10 text-center">Loading calendar...</div>;
+}
+
 
   if (loading) {
     return (
@@ -307,7 +369,11 @@ const InterviewBooking: React.FC = () => {
               {weekDays.map(day => (
                 <button
                   key={day.toString()}
-                  onClick={() => setSelectedDate(day)}
+                    onClick={() => {
+                        setSelectedDate(day);
+                        navigate(`/booking?date=${format(day, "yyyy-MM-dd")}`);
+                      }}
+
                   className={`p-2 text-center rounded-lg border transition-colors duration-200 ${
                     isSameDay(day, selectedDate)
                       ? 'bg-blue-600 text-white border-blue-600'

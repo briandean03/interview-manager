@@ -21,6 +21,8 @@ const CandidateSelection: React.FC = () => {
   const [error, setError] = useState<string>('')
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'failed'>('checking')
   const [createdFilter, setCreatedFilter] = useState<string>('all')
+  const [positions, setPositions] = useState<{ code: string; name: string }[]>([]);
+
 
   
   // Appointment form state
@@ -103,6 +105,24 @@ const CandidateSelection: React.FC = () => {
         setSelectedCandidate(data[0])
         selectedCandidateRef.current = data[0]
       }
+
+      // Fetch Position Names (position_code + position_name)
+      const { data: positionRows, error: positionError } = await client
+        .from("hrta_sd00-01_position_codes")
+        .select("position_code, position_name")
+        .order("position_name", { ascending: true });
+
+      if (positionError) {
+        console.error("Position fetch error:", positionError);
+      } else {
+        setPositions(
+          positionRows?.map(row => ({
+            code: row.position_code,
+            name: row.position_name || row.position_code
+          })) || []
+        );
+      }
+
       
       console.log('Successfully loaded candidates:', data?.length || 0)
     } catch (error) {
@@ -272,24 +292,19 @@ const filteredCandidates = React.useMemo(() => {
   })
 }, [candidates, searchTerm, statusFilter, positionFilter, createdFilter])
 
-  // Extract unique positions
-const uniquePositions = React.useMemo(() => 
-  [...new Set(candidates.map(c => c.position_code).filter(Boolean))], 
-  [candidates]
-)
 
 // Extract unique statuses EXCEPT video statuses
-const uniqueStatuses = React.useMemo(() =>
-  [...new Set(
+const uniqueStatuses = React.useMemo(() => {
+  return [...new Set(
     candidates
       .map(c => c.status)
       .filter(status =>
         status &&
         !status.toLowerCase().includes("answer video to")
       )
-  )],
-  [candidates]
-)
+  )].sort((a, b) => a.localeCompare(b));
+}, [candidates]);
+
 
 
 
@@ -524,8 +539,8 @@ const uniqueStatuses = React.useMemo(() =>
                   onChange={(e) => setPositionFilter(e.target.value)}
                 >
                   <option value="all">All Positions</option>
-                  {uniquePositions.map(position => (
-                    <option key={position} value={position}>{position}</option>
+                  {positions.map(pos => (
+                    <option key={pos.code} value={pos.code}>{pos.name}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />

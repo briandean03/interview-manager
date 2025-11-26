@@ -11,6 +11,10 @@ import AppointmentCalendar from '../components/AppointmentCalendar'
 import AppointmentForm from '../components/AppointmentForm'
 import CandidateSearchModal from '../components/CandidateSearchModal'
 import { Candidate } from "../lib/Candidate"
+import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+
+
 
 
 interface DashboardStats {
@@ -31,9 +35,18 @@ const Dashboard: React.FC = () => {
   const [showAppointmentForm, setShowAppointmentForm] = useState(false)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showCandidateSearch, setShowCandidateSearch] = useState(false)
+  const navigate = useNavigate();
+  const [progressSnapshot, setProgressSnapshot] = useState({
+  activeCandidates: 0,
+  totalActivities: 0,
+  latestActivity: null as string | null,
+  topCandidates: [] as { name: string; time: string }[]
+});
+
 
   useEffect(() => {
-    fetchDashboardStats()
+    fetchDashboardStats();
+    fetchProgressSnapshot();
   }, [])
 
   const fetchDashboardStats = async () => {
@@ -42,6 +55,7 @@ const Dashboard: React.FC = () => {
     const { data: candidates } = await supabase
       .from("hrta_cd00-01_resume_extraction")
       .select("candidate_id, status")
+      .order("created_at", { ascending: false })
 
     const totalCandidates = candidates?.length || 0
 
@@ -100,6 +114,60 @@ const Dashboard: React.FC = () => {
     setLoading(false)
   }
 }
+const fetchProgressSnapshot = async () => {
+  try {
+    // Get logs (last 7 days, latest first)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data: logs } = await supabase
+      .from("hrta_sd00-09_execution_log")
+      .select("id, created_at, candidate_id, current_status")
+      .gte("created_at", sevenDaysAgo.toISOString())
+      .order("created_at", { ascending: false });
+
+    if (!logs || logs.length === 0) return;
+
+    // Find unique candidate IDs
+    const candidateIds = [...new Set(logs.map(l => l.candidate_id))];
+
+    // Get candidate names
+    const { data: candidates } = await supabase
+      .from("hrta_cd00-01_resume_extraction")
+      .select("candidate_id, first_name, last_name")
+      .in("candidate_id", candidateIds);
+
+    // Combine logs + names
+    const nameMap = new Map(
+      candidates?.map(c => [c.candidate_id, `${c.first_name} ${c.last_name}`]) || []
+    );
+
+    // Build grouped list by candidate
+    const grouped = candidateIds.map(id => {
+      const candidateLogs = logs.filter(l => l.candidate_id === id);
+      return {
+        name: nameMap.get(id) || "Unknown",
+        latestTime: candidateLogs[0]?.created_at || null
+      };
+    });
+
+    // Sort by recent activity
+    grouped.sort((a, b) => new Date(b.latestTime).getTime() - new Date(a.latestTime).getTime());
+
+    setProgressSnapshot({
+      activeCandidates: candidateIds.length,
+      totalActivities: logs.length,
+      latestActivity: logs[0].created_at,
+      topCandidates: grouped.slice(0, 3).map(g => ({
+        name: g.name,
+        time: g.latestTime
+      }))
+    });
+
+  } catch (err) {
+    console.error("Error fetching progress snapshot:", err);
+  }
+};
 
 
 
@@ -185,6 +253,9 @@ const Dashboard: React.FC = () => {
           ))}
         </section>
 
+
+
+
         {/* Quick Actions */}
         <section className="mb-5 sm:mb-7">
           <QuickActions
@@ -204,13 +275,67 @@ const Dashboard: React.FC = () => {
           </button>
         </section>
 
+                {/* Interview Progress Snapshot */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Interview Progress Snapshot
+          </h3>
+
+          <div className="grid grid-cols-3 gap-4 mb-5">
+            <div>
+              <p className="text-sm text-gray-600">Active Candidates</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {progressSnapshot.activeCandidates}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-600">Total Activities</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {progressSnapshot.totalActivities}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-600">Latest Activity</p>
+              <p className="text-sm font-medium text-gray-800">
+                {progressSnapshot.latestActivity
+                  ? new Date(progressSnapshot.latestActivity).toLocaleString()
+                  : "—"}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {progressSnapshot.topCandidates.map((c, i) => (
+              <div key={i} className="flex justify-between text-sm">
+                <span className="font-medium text-gray-900 truncate">{c.name}</span>
+                <span className="text-gray-500">
+                  {new Date(c.time).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={() => (window.location.href = "/progress")}
+            className="mt-4 text-blue-600 text-sm font-medium hover:underline"
+          >
+            View full monitor →
+          </button>
+        </div>
+
         {/* Calendar + Recent Activity */}
         <section className="flex flex-col lg:grid lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Calendar */}
           <div className="lg:col-span-2 order-1">
             <AppointmentCalendar
               selectedDate={selectedDate}
-              onDateSelect={setSelectedDate}
+              onDateSelect={(date) => {
+                const localDate = format(date, "yyyy-MM-dd");
+                navigate(`/booking?date=${localDate}`);
+              }}
+
             />
           </div>
 

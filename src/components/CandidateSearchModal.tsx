@@ -26,6 +26,13 @@ const CandidateSearchModal: React.FC<CandidateSearchModalProps> = ({ isOpen, onC
   const [positions, setPositions] = useState<Position[]>([]) // ✅ position dropdown data
   const [results, setResults] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(false)
+  
+// Auto-search when name or position changes
+useEffect(() => {
+  if (isOpen) {
+    handleSearch();
+  }
+}, [name, positionCode, isOpen]);
 
   // ✅ Fetch positions for dropdown (once)
   useEffect(() => {
