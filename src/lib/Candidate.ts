@@ -23,4 +23,8 @@ export interface Candidate {
   application_date?: string | null
   created_at: string
   date_interviewed?: string | null
+
+  age?: number | null
+  answer_vids_folder_id?: string | null
+  cv_filename?: string | null
 }
